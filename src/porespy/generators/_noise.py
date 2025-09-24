@@ -1,9 +1,7 @@
-from typing import Literal
-
 import numpy as np
+from porespy.tools import norm_to_uniform
 import psutil
 
-from porespy.tools import all_to_uniform, parse_shape
 
 __all__ = [
     'fractal_noise',
@@ -12,26 +10,22 @@ __all__ = [
 
 def fractal_noise(
     shape,
-    porosity: float = None,
-    frequency: float = 0.05,
-    octaves: int = 4,
-    gain: float = 0.5,
-    mode: Literal["simplex", "perlin", "value", "cubic"] = "simplex",
-    seed: int = None,
-    cores: int = 1,
-    uniform: bool = True,
+    frequency=0.05,
+    octaves=4,
+    gain=0.5,
+    mode='simplex',
+    seed=None,
+    cores=None,
+    uniform=True,
 ):
     r"""
-    Generate fractal noise with realistic structures across scales.
+    Generate fractal noise which can be thresholded to create binary
+    images with realistic structures across scales.
 
     Parameters
     ----------
     shape : array_like
         The size of the image to generate, can be 2D or 3D.
-    porosity : float
-        If specified, this will convert the noise distribution to uniform
-        (no need to set uniform to ``True``), and then threshold the image
-        to the specified value prior to returning.
     frequency : scalar, default=0.05
         Controls the overall scale of the generated noise, with larger
         values giving smaller structures.
@@ -81,28 +75,26 @@ def fractal_noise(
     called `FastNoiseSIMD <https://github.com/Auburn/FastNoiseSIMD>`_.
     To access the more elaborate functionality and options of these
     packages, explore the `pyfastnoisesimd documentation
-    <https://pyfastnoisesimd.readthedocs.io/en/latest/overview.html>`__.
+    <https://pyfastnoisesimd.readthedocs.io/en/latest/overview.html>`_.
 
     Examples
     --------
     `Click here
-    <https://porespy.org/examples/generators/reference/fractal_noise.html>`__
+    <https://porespy.org/examples/generators/reference/fractal_noise.html>`_
     to view online example.
 
     """
     try:
         from pyfastnoisesimd import Noise, NoiseType, PerturbType
     except ModuleNotFoundError:
-        raise ModuleNotFoundError(
-            "You need to install `pyfastnoisesimd` using" " `pip install pyfastnoisesimd`"
-        )
+        raise ModuleNotFoundError("You need to install `pyfastnoisesimd` using"
+                                  " `pip install pyfastnoisesimd`")
     if cores is None:
         cores = psutil.cpu_count(logical=False)
     if seed is None:
         seed = np.random.randint(2**31)
-    shape = parse_shape(shape)
     perlin = Noise(numWorkers=cores)
-    perlin.noiseType = getattr(NoiseType, f"{mode.capitalize()}Fractal")
+    perlin.noiseType = getattr(NoiseType, f'{mode.capitalize()}Fractal')
     perlin.frequency = frequency
     perlin.fractal.octaves = octaves
     perlin.fractal.gain = gain
@@ -110,8 +102,6 @@ def fractal_noise(
     perlin.perturb.perturbType = PerturbType.NoPerturb
     perlin.seed = seed
     result = perlin.genAsGrid(shape)
-    if porosity or uniform:
-        result = all_to_uniform(result, scale=[0, 1])
-    if porosity:
-        result = result < porosity
+    if uniform:
+        result = norm_to_uniform(result, scale=[0, 1])
     return result
